@@ -23,6 +23,16 @@ This web-based tool converts GitHub repository (or local directory) contents  in
 
 This tool runs entirely in the browser, ensuring data security without server-side processing.
 
+## Local Development
+
+To run the application locally:
+
+```bash
+python -m http.server 8000
+```
+
+Then open http://localhost:8000 in your browser.
+
 
 ## To do
 
