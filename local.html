@@ -49,7 +49,7 @@
         <h1 class="text-3xl font-bold mb-2 text-center text-gray-600">Local Directory to Plain Text</h1>
         <p class="text-lg text-center text-gray-500 mb-6">Convert Local Directory or Zip File to a Single Formatted Text File</p>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
                 <label for="directoryPicker" class="block text-sm font-medium text-gray-600">Select Directory:</label>
                 <input type="file" id="directoryPicker" webkitdirectory directory multiple class="mt-1 block w-full">
@@ -58,6 +58,11 @@
                 <label for="zipPicker" class="block text-sm font-medium text-gray-600">Or Upload Zip File:</label>
                 <input type="file" id="zipPicker" accept=".zip,.rar,.7z" class="mt-1 block w-full">
                 <p class="text-xs text-gray-500 mt-1">Supported formats: .zip, .rar, .7z</p>
+            </div>
+            <div>
+                <label for="filePicker" class="block text-sm font-medium text-gray-600">Add Individual Files:</label>
+                <input type="file" id="filePicker" multiple class="mt-1 block w-full">
+                <p class="text-xs text-gray-500 mt-1">Select additional files to include</p>
             </div>
         </div>
 

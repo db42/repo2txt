@@ -3,12 +3,16 @@ import { extractZipContents } from './zip-utils.js';
 
 // Add at the top of the file with other imports
 let pathZipMap = {};
+let individualFiles = [];
 
 // Event listener for directory selection
 document.getElementById('directoryPicker').addEventListener('change', handleDirectorySelection);
 
 // Event listener for zip file selection
 document.getElementById('zipPicker').addEventListener('change', handleZipSelection);
+
+// Event listener for individual file selection
+document.getElementById('filePicker').addEventListener('change', handleFileSelection);
 
 async function handleDirectorySelection(event) {
     const files = event.target.files;
@@ -40,12 +44,14 @@ async function handleDirectorySelection(event) {
                         }
                     }
                 });
-                filterAndDisplayTree(tree, gitignoreContent);
+                const combinedTree = mergeFileTrees(tree, individualFiles);
+                filterAndDisplayTree(combinedTree, gitignoreContent);
             };
             gitignoreReader.readAsText(file);
         }
     }
-    filterAndDisplayTree(tree, gitignoreContent);
+    const combinedTree = mergeFileTrees(tree, individualFiles);
+    filterAndDisplayTree(combinedTree, gitignoreContent);
 }
 
 // Handle zip file selection
@@ -61,8 +67,9 @@ async function handleZipSelection(event) {
         const { tree, gitignoreContent, pathZipMap: extractedPathZipMap } = await extractZipContents(file);
         pathZipMap = extractedPathZipMap;  // Update the global variable
         
-        // Filter and display the tree
-        filterAndDisplayTree(tree, gitignoreContent);
+        // Merge with individual files and display
+        const combinedTree = mergeFileTrees(tree, individualFiles);
+        filterAndDisplayTree(combinedTree, gitignoreContent);
     } catch (error) {
         const outputText = document.getElementById('outputText');
         outputText.value = `Error processing zip file: ${error.message}\n\n` +
@@ -112,7 +119,7 @@ document.getElementById('generateTextButton').addEventListener('click', async fu
     }
 });
 
-// Modify fetchFileContents to handle both URL and text content
+// Modify fetchFileContents to handle URL, text content, and individual files
 async function fetchFileContents(files) {
     const contents = await Promise.all(files.map(async file => {
         if (file.urlType === 'zip') {
@@ -120,7 +127,7 @@ async function fetchFileContents(files) {
             const text = await pathZipMap[relativePath].async('text');
             return { url: file.url, path: relativePath, text };
         } else {
-            // Fetch content from URL (from directory)
+            // Fetch content from URL (from directory or individual files)
             const response = await fetch(file.url);
             if (!response.ok) {
                 throw new Error(`Failed to fetch file: ${file.path}`);
@@ -136,6 +143,77 @@ async function fetchFileContents(files) {
 document.addEventListener('DOMContentLoaded', function() {
     lucide.createIcons();
 });
+
+// Handle individual file selection
+async function handleFileSelection(event) {
+    const files = event.target.files;
+    if (files.length === 0) return;
+
+    // Convert FileList to array and create file objects
+    const newFiles = Array.from(files).map(file => ({
+        path: file.name,
+        type: 'blob',
+        urlType: 'individual',
+        url: URL.createObjectURL(file)
+    }));
+
+    // Add to individual files array
+    individualFiles.push(...newFiles);
+
+    // Get current tree (directory or zip)
+    const currentTree = getCurrentTree();
+    const combinedTree = mergeFileTrees(currentTree, individualFiles);
+    
+    // Use default gitignore if no directory is selected
+    const gitignoreContent = ['.git/**'];
+    filterAndDisplayTree(combinedTree, gitignoreContent);
+}
+
+// Get current tree from directory or zip selection
+function getCurrentTree() {
+    // Check if directory is selected
+    const directoryFiles = document.getElementById('directoryPicker').files;
+    if (directoryFiles.length > 0) {
+        const tree = [];
+        for (let file of directoryFiles) {
+            const filePath = file.webkitRelativePath.startsWith('/') ? file.webkitRelativePath.slice(1) : file.webkitRelativePath;
+            tree.push({
+                path: filePath,
+                type: 'blob',
+                urlType: 'directory',
+                url: URL.createObjectURL(file)
+            });
+        }
+        return tree;
+    }
+    
+    // Check if zip is selected (pathZipMap will be populated)
+    if (Object.keys(pathZipMap).length > 0) {
+        return Object.keys(pathZipMap).map(path => ({
+            path: path,
+            type: 'blob',
+            urlType: 'zip',
+            url: path
+        }));
+    }
+    
+    return [];
+}
+
+// Merge file trees from different sources
+function mergeFileTrees(mainTree, additionalFiles) {
+    const combined = [...mainTree];
+    
+    // Add individual files, avoiding duplicates
+    additionalFiles.forEach(file => {
+        const exists = combined.some(existing => existing.path === file.path);
+        if (!exists) {
+            combined.push(file);
+        }
+    });
+    
+    return combined;
+}
 
 function isIgnored(filePath, gitignoreRules) {
     return gitignoreRules.some(rule => {
