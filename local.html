@@ -67,6 +67,16 @@
         </div>
 
         <div>
+            <label for="nestingLevel" class="block text-sm font-medium text-gray-600">Enter the supported nested level (e.g. 3):</label>
+            <input type="number" id="nestingLevel" name="nestingLevel" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 h-10 px-2">
+        </div>
+
+        <div class="mt-4">
+            <label for="excludeStrings" class="block text-sm font-medium text-gray-600">Exclude files containing (comma-separated):</label>
+            <input type="text" id="excludeStrings" name="excludeStrings" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 h-10 px-2" placeholder="e.g. test,mock,tmp">
+        </div>
+
+        <div>
             <a href="/" class="text-blue-500 hover:text-blue-700 underline">
                 Convert From GitHub Instead
             </a>

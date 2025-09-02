@@ -4,6 +4,7 @@ import { extractZipContents } from './zip-utils.js';
 // Add at the top of the file with other imports
 let pathZipMap = {};
 let individualFiles = [];
+let directoryFiles = [];
 
 // Event listener for directory selection
 document.getElementById('directoryPicker').addEventListener('change', handleDirectorySelection);
@@ -19,14 +20,17 @@ async function handleDirectorySelection(event) {
     if (files.length === 0) return;
 
     const gitignoreContent = ['.git/**']
-    const tree = [];
+    const newDirectoryFiles = [];
+    
+    // Add new directory files to the array
     for (let file of files) {
         const filePath = file.webkitRelativePath.startsWith('/') ? file.webkitRelativePath.slice(1) : file.webkitRelativePath;
-        tree.push({
+        newDirectoryFiles.push({
             path: filePath,
             type: 'blob',
             urlType: 'directory',
-            url: URL.createObjectURL(file)
+            url: URL.createObjectURL(file),
+            file: file
         });
         if (file.webkitRelativePath.endsWith('.gitignore')) {
             const gitignoreReader = new FileReader();
@@ -44,13 +48,18 @@ async function handleDirectorySelection(event) {
                         }
                     }
                 });
-                const combinedTree = mergeFileTrees(tree, individualFiles);
+                const allDirectoryFiles = [...directoryFiles, ...newDirectoryFiles];
+                const combinedTree = mergeFileTrees(allDirectoryFiles, individualFiles);
                 filterAndDisplayTree(combinedTree, gitignoreContent);
             };
             gitignoreReader.readAsText(file);
         }
     }
-    const combinedTree = mergeFileTrees(tree, individualFiles);
+    
+    // Append new directory files to the global array
+    directoryFiles.push(...newDirectoryFiles);
+    
+    const combinedTree = mergeFileTrees(directoryFiles, individualFiles);
     filterAndDisplayTree(combinedTree, gitignoreContent);
 }
 
@@ -60,8 +69,9 @@ async function handleZipSelection(event) {
     if (!file) return;
 
     try {
-        // Clear the directory picker
+        // Clear the directory picker and directory files array
         document.getElementById('directoryPicker').value = '';
+        directoryFiles = [];
 
         // Extract zip contents and update the global pathZipMap
         const { tree, gitignoreContent, pathZipMap: extractedPathZipMap } = await extractZipContents(file);
@@ -100,10 +110,33 @@ document.getElementById('generateTextButton').addEventListener('click', async fu
     outputText.value = '';
 
     try {
-        const selectedFiles = getSelectedFiles();
+        let selectedFiles = getSelectedFiles();
         if (selectedFiles.length === 0) {
             throw new Error('No files selected');
         }
+
+        const nestingLevel = parseInt(document.getElementById('nestingLevel').value, 10);
+        if (!isNaN(nestingLevel) && nestingLevel > 0) {
+            selectedFiles = selectedFiles.filter(file => {
+                const depth = (file.path.match(/\//g) || []).length;
+                return depth < nestingLevel;
+            });
+        }
+
+        const excludeInput = document.getElementById('excludeStrings').value;
+        if (excludeInput) {
+            const excludeStrings = excludeInput.split(',').map(s => s.trim()).filter(Boolean);
+            if (excludeStrings.length > 0) {
+                selectedFiles = selectedFiles.filter(file => 
+                    !excludeStrings.some(excludeString => file.path.includes(excludeString))
+                );
+            }
+        }
+
+        if (selectedFiles.length === 0) {
+            throw new Error('No files selected after filtering by nesting level');
+        }
+        
         const fileContents = await fetchFileContents(selectedFiles);
         const formattedText = formatRepoContents(fileContents);
         outputText.value = formattedText;
@@ -171,20 +204,9 @@ async function handleFileSelection(event) {
 
 // Get current tree from directory or zip selection
 function getCurrentTree() {
-    // Check if directory is selected
-    const directoryFiles = document.getElementById('directoryPicker').files;
+    // Check if directory files are available
     if (directoryFiles.length > 0) {
-        const tree = [];
-        for (let file of directoryFiles) {
-            const filePath = file.webkitRelativePath.startsWith('/') ? file.webkitRelativePath.slice(1) : file.webkitRelativePath;
-            tree.push({
-                path: filePath,
-                type: 'blob',
-                urlType: 'directory',
-                url: URL.createObjectURL(file)
-            });
-        }
-        return tree;
+        return directoryFiles;
     }
     
     // Check if zip is selected (pathZipMap will be populated)
@@ -204,7 +226,7 @@ function getCurrentTree() {
 function mergeFileTrees(mainTree, additionalFiles) {
     const combined = [...mainTree];
     
-    // Add individual files, avoiding duplicates
+    // Add additional files, avoiding duplicates based on path
     additionalFiles.forEach(file => {
         const exists = combined.some(existing => existing.path === file.path);
         if (!exists) {
@@ -241,8 +263,7 @@ function isIgnored(filePath, gitignoreRules) {
 }
 
 // Function to copy text to clipboard with fallback
-function copyToClipboard(text) {
-    // Try using the modern Clipboard API first
+function copyToClipboard(text) {    // Try using the modern Clipboard API first
     if (navigator.clipboard && window.isSecureContext) {
         return navigator.clipboard.writeText(text)
             .then(() => console.log('Text copied to clipboard'))
@@ -300,3 +321,4 @@ document.getElementById('downloadButton').addEventListener('click', function () 
     a.click();
     URL.revokeObjectURL(url);
 });
+
